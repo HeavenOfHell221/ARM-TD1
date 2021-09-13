@@ -6,6 +6,8 @@
 #include <QMenuBar>
 #include <QMessageBox>
 
+using namespace std;
+
 DicomViewer::DicomViewer(QWidget *parent) : QMainWindow(parent) {
   // Setting menu
   QMenu *file_menu = menuBar()->addMenu("&File");
