@@ -15,6 +15,12 @@ class DicomViewer : public QMainWindow {
 public:
   DicomViewer(QWidget *parent = 0);
   ~DicomViewer();
+  OFString patientName;
+  OFString instanceNumber;
+  OFString acquisitionNumber;
+  OFString transferSyntaxUID;
+  OFString referencedFrameNumbers;  
+  OFString patientSize;
 
 public slots:
   void openDicom();
