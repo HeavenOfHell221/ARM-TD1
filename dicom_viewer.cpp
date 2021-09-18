@@ -1,4 +1,5 @@
 #include "dicom_viewer.h"
+#include "dcmtk/dcmimage/diregist.h"
 
 #include <iostream>
 #include <QFileDialog>
@@ -21,15 +22,15 @@ DicomViewer::DicomViewer(QWidget *parent) : QMainWindow(parent) {
 DicomViewer::~DicomViewer() {}
 
 void DicomViewer::openDicom() {
-  QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),"..",tr("Dcm File Format (*.dcm)"));
-  string str = fileName.toStdString();
-  const char* p = str.c_str();
+  QString fileName_Qt = QFileDialog::getOpenFileName(this, tr("Open File"),"..",tr("Dcm File Format (*.dcm)"));
+  string fileName_str = fileName_Qt.toStdString();
+  const char* fileName = fileName_str.c_str();
   
   ostringstream msg_oss;
   msg_oss << "Your file have been succesfully selected" << endl;
   
   DcmFileFormat fileformat;
-  OFCondition status = fileformat.loadFile(p);
+  OFCondition status = fileformat.loadFile(fileName);
 
   if (status.good()){
 
@@ -109,6 +110,46 @@ void DicomViewer::openDicom() {
   // Slop : Maybe DCM_RescaleSlope
   // Intercept : Maybe DCM_RescaleIntercept
 
+
+
+  DicomImage *image = new DicomImage(fileName);
+  if (image != NULL)
+  {
+    EI_Status status = image->getStatus();
+
+    switch (status)
+    {
+      case EIS_Normal:
+      {
+        Uint8 *pixelData = (Uint8 *)(image->getOutputData(16 /* bits per sample */));
+        if (pixelData != NULL)
+        {
+          /* do something useful with the pixel data */
+        }
+        break;
+      }
+      default:
+      {
+        cerr << "Error: cannot load DICOM image (" << DicomImage::getString(image->getStatus()) << ")" << endl;
+
+        /*
+          gabriel@Heaven:~/GitHub/ARM-TD1/build$ dcm2pnm ../Unknown\ Study/CT\ PLAIN\ THIN/CT000001.dcm test.png
+          E: can't change to unencapsulated representation for pixel data
+          E: can't determine 'PhotometricInterpretation' of decompressed image
+          E: mandatory attribute 'PhotometricInterpretation' is missing or can't be determined
+          F: Missing attribute
+
+          Same error as the code with the command line for convert DICOM images to .png.
+          The error is with all extension (ppm, png, ..), so it's either the DICOM file or it's not the right conversion.
+            -> Add missing attributes? or fill them
+            -> Intermediate conversion?
+        */
+        break;
+      }
+    }
+  }
+  delete image;
+  
   QMessageBox::information(this, "DCM file properties", msg_oss.str().c_str());
 }
 
