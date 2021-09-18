@@ -21,13 +21,12 @@ DicomViewer::DicomViewer(QWidget *parent) : QMainWindow(parent) {
 DicomViewer::~DicomViewer() {}
 
 void DicomViewer::openDicom() {
-
-  ostringstream msg_oss;
-  msg_oss << "Your file have been succesfully selected" << endl;
-
-  QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),"/path/to/file/",tr("Dcm File Format (*.dcm)"));
+  QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),"..",tr("Dcm File Format (*.dcm)"));
   string str = fileName.toStdString();
   const char* p = str.c_str();
+  
+  ostringstream msg_oss;
+  msg_oss << "Your file have been succesfully selected" << endl;
   
   DcmFileFormat fileformat;
   OFCondition status = fileformat.loadFile(p);
@@ -88,6 +87,27 @@ void DicomViewer::openDicom() {
   } else { 
     cerr << "Error: cannot read DICOM file (" << status.text() << ")" << endl;
   }
+
+  /* A few trails */
+
+  // Allowed values : If it's a range
+  //  - DCM_NominalMinEnergy / DCM_NominalMaxEnergy
+  //  - DCM_MinimumStoredValueMapped / DCM_MaximumStoredValueMapped
+  //  - DCM_MinDensity / DCM_MaxDensity
+  //  - DCM_DVHMinimumDose / DCM_DVHMaximumDose
+  //  - DCM_ChannelMinimumValue / DCM_ChannelMaximumValue
+  //  - Very likely : Bits Allocated -> [0; 2^DCM_BitsAllocated]
+
+  // Used values :
+  //  - [0; 2^DCM_BitsStored]
+  //  - [0; 2^DCM_HighBit]
+  
+  // Window :
+  //  - [DCM_EnergyWindowLowerLimit; DCM_EnergyWindowUpperLimit] 
+  //  - Very likely : DCM_WindowCenter and DCM_WindowWidth
+
+  // Slop : Maybe DCM_RescaleSlope
+  // Intercept : Maybe DCM_RescaleIntercept
 
   QMessageBox::information(this, "DCM file properties", msg_oss.str().c_str());
 }
