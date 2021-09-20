@@ -34,8 +34,10 @@ void DicomViewer::openDicom() {
 
   if (status.good()){
 
+    DcmDataset *dataset = fileformat.getDataset();
+
     // (1/11) The dicom deftag DCM_PatientName seems to be the best
-    if (fileformat.getDataset()->findAndGetOFString(DCM_PatientName, patientName).good()) {
+    if (dataset->findAndGetOFString(DCM_PatientName, patientName).good()) {
       cout << "Patient's Name: " << patientName << endl;
     } else {
       cerr << "Error: cannot access Patient's Name." << endl;
@@ -44,7 +46,7 @@ void DicomViewer::openDicom() {
     /*-----------------------------*/
 
     // (2/11) The dicom deftag DCM_InstanceNumber seems to be the best
-    if (fileformat.getDataset()->findAndGetOFString(DCM_InstanceNumber, instanceNumber).good()) {
+    if (dataset->findAndGetOFString(DCM_InstanceNumber, instanceNumber).good()) {
       cout << "Instance number: " << instanceNumber << endl;
     } else {
       cerr << "Error: cannot access Instance number!" << endl;
@@ -53,7 +55,7 @@ void DicomViewer::openDicom() {
     /*-----------------------------*/
 
     // (3/11) The dicom deftag DCM_AcquisitionNumber seems to be the best
-    if (fileformat.getDataset()->findAndGetOFString(DCM_AcquisitionNumber, acquisitionNumber).good()) {
+    if (dataset->findAndGetOFString(DCM_AcquisitionNumber, acquisitionNumber).good()) {
       cout << "Acquisition number: " << acquisitionNumber << endl;
     } else {
       cerr << "Error: cannot access Acquisition number !" << endl;
@@ -63,7 +65,7 @@ void DicomViewer::openDicom() {
 
     // (4/11) The dicom deftag DCM_TransferSyntaxUID don't have the same label as required but seems to be 
     //        the best among the others
-    if (fileformat.getDataset()->findAndGetOFString(DCM_TransferSyntaxUID, transferSyntaxUID).good()) {
+    if (dataset->findAndGetOFString(DCM_TransferSyntaxUID, transferSyntaxUID).good()) {
       cout << "Transfer Syntax UID: " << transferSyntaxUID << endl;
     } else {
       cerr << "Error: cannot access Transfer Syntax UID!" << endl;
@@ -73,7 +75,7 @@ void DicomViewer::openDicom() {
 
     // (5/11) The dicom deftag DCM_ReferencedFrameNumbers don't have the same label as required but seems to be 
     //        the best among the others
-    if (fileformat.getDataset()->findAndGetOFString(DCM_ReferencedFrameNumbers, referencedFrameNumbers).good()) {
+    if (dataset->findAndGetOFString(DCM_ReferencedFrameNumbers, referencedFrameNumbers).good()) {
       cout << "Referenced frame numbers: " << referencedFrameNumbers << endl;
     } else {
       cerr << "Error: cannot access Referenced frame numbers!" << endl;
@@ -83,7 +85,7 @@ void DicomViewer::openDicom() {
    
     // (6/11) The dicom deftag DCM_PatientSize don't have the same label as required but seems to be 
     //        the best among the others
-    if (fileformat.getDataset()->findAndGetOFString(DCM_PatientSize, patientSize).good()) {
+    if (dataset->findAndGetOFString(DCM_PatientSize, patientSize).good()) {
       cout << "patientSize: " << patientSize << endl;
     } else {
       cerr << "Error: cannot access patientSize!" << endl;
@@ -100,7 +102,7 @@ void DicomViewer::openDicom() {
 
     //  There is too many possibilities to choose randomly one among them, so it's possibly none of them and more likely  
     //  a range between 0 and 2^DCM_BitsAllocated.
-    if (fileformat.getDataset()->findAndGetOFString(DCM_BitsAllocated, bitsAllocated).good()) {
+    if (dataset->findAndGetOFString(DCM_BitsAllocated, bitsAllocated).good()) {
       cout << "0,bitsAllocated: " << "0" << "," << bitsAllocated << endl;
     } else {
       cerr << "Error: cannot access bitsAllocated!" << endl;
@@ -111,8 +113,9 @@ void DicomViewer::openDicom() {
     // (8/11) Used values :
     //  - [0; 2^DCM_BitsStored]
     //  - [0; 2^DCM_HighBit]
-    if (fileformat.getDataset()->findAndGetOFString(DCM_BitsStored, bitsStored).good()
-    &&  fileformat.getDataset()->findAndGetOFString(DCM_HighBit, highBit).good()
+    //  - [SmallestImagePixelValue; LargestImagePixelValue]
+    if (dataset->findAndGetOFString(DCM_BitsStored, bitsStored).good()
+    &&  dataset->findAndGetOFString(DCM_HighBit, highBit).good()
     ) {
       cout << "bitsStored,highBit: " << bitsStored << "," << highBit << endl;
     } else {
@@ -124,8 +127,8 @@ void DicomViewer::openDicom() {
     // (9/11) Window :
     //  - [DCM_EnergyWindowLowerLimit; DCM_EnergyWindowUpperLimit] 
     //  - Very likely : DCM_WindowCenter and DCM_WindowWidth
-    if (fileformat.getDataset()->findAndGetOFString(DCM_WindowCenter, windowCenter).good()
-    &&  fileformat.getDataset()->findAndGetOFString(DCM_WindowWidth, windowWidth).good()
+    if (dataset->findAndGetOFString(DCM_WindowCenter, windowCenter).good()
+    &&  dataset->findAndGetOFString(DCM_WindowWidth, windowWidth).good()
     ) {
       cout << "windowCenter,windowWidth: " << windowCenter << "," << windowWidth << endl;
     } else {
@@ -135,7 +138,7 @@ void DicomViewer::openDicom() {
     /*-----------------------------*/
 
     // (10/11) Slop : Maybe DCM_RescaleSlope
-    if (fileformat.getDataset()->findAndGetOFString(DCM_RescaleSlope, rescaleSlope).good()) {
+    if (dataset->findAndGetOFString(DCM_RescaleSlope, rescaleSlope).good()) {
       cout << "rescaleSlope: " << rescaleSlope << endl;
     } else {
       cerr << "Error: cannot access rescaleSlope!" << endl;
@@ -144,56 +147,42 @@ void DicomViewer::openDicom() {
     /*-----------------------------*/
 
     //(11/11) Intercept : Maybe DCM_RescaleIntercept
-    if (fileformat.getDataset()->findAndGetOFString(DCM_RescaleIntercept, rescaleIntercept).good()) {
+    if (dataset->findAndGetOFString(DCM_RescaleIntercept, rescaleIntercept).good()) {
       cout << "rescaleIntercept: " << rescaleIntercept << endl;
     } else {
       cerr << "Error: cannot access rescaleIntercept!" << endl;
     }
 
-  } else { 
-    cerr << "Error: cannot read DICOM file (" << status.text() << ")" << endl;
-  }
+    /* ------------------------------ Part 3 : ------------------------------ */
+    
+    DicomImage *image = new DicomImage(dataset, dataset->getCurrentXfer(), 0);
+    
+    stringstream ss;
+    int width, center;
+    ss << windowCenter;
+    ss >> center;
+    ss << windowWidth;
+    ss >> width;
 
-  /* ------------------------------ Part 3 : ------------------------------ */
-
-  DicomImage *image = new DicomImage(fileName);
-  if (image != NULL)
-  {
-    EI_Status status = image->getStatus();
-
-    switch (status)
+    image->setWindow(width, center);
+    
+    if (image != NULL)
     {
-      case EIS_Normal:
+      EI_Status status = image->getStatus();
+
+      if(status == EIS_Normal) 
       {
-        Uint8 *pixelData = (Uint8 *)(image->getOutputData(16 /* bits per sample */));
-        if (pixelData != NULL)
-        {
-          /* do something useful with the pixel data */
-        }
-        break;
+        const char* ptr = (char*) image->getOutputData();
+        QImage imageQt = QImage(ptr);
+        cerr << "Good" << endl;
       }
-      default:
+      else 
       {
         cerr << "Error: cannot load DICOM image (" << DicomImage::getString(image->getStatus()) << ")" << endl;
-
-        /*
-          gabriel@Heaven:~/GitHub/ARM-TD1/build$ dcm2pnm ../Unknown\ Study/CT\ PLAIN\ THIN/CT000001.dcm test.png
-          E: can't change to unencapsulated representation for pixel data
-          E: can't determine 'PhotometricInterpretation' of decompressed image
-          E: mandatory attribute 'PhotometricInterpretation' is missing or can't be determined
-          F: Missing attribute
-
-          Same error as the code with the command line for convert DICOM images to .png.
-          The error is with all extension (ppm, png, ..), so it's either the DICOM file or it's not the right conversion.
-            -> Add missing attributes? or fill them
-            -> Intermediate conversion?
-        */
-        break;
       }
     }
+    delete image;
   }
-  delete image;
-  
   QMessageBox::information(this, "DCM file properties", msg_oss.str().c_str());
 }
 
@@ -213,8 +202,3 @@ void DicomViewer::showStats() {
 
   QMessageBox::information(this, "DCM file properties", msg_oss.str().c_str());
 }
-
-
-
-
-
