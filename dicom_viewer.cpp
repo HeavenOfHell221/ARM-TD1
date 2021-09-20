@@ -5,6 +5,7 @@
 #include <QFileDialog>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QLabel>
 
 using namespace std;
 
@@ -209,7 +210,7 @@ void DicomViewer::openDicom()
 		DJDecoderRegistration::registerCodecs();
 		DcmRLEDecoderRegistration::registerCodecs();
 
-		DicomImage *image = new DicomImage(dataset, dataset->getCurrentXfer());
+		DicomImage *image = new DicomImage(dataset, dataset->getCurrentXfer(), slope, intercept, 0, 0, 0);
 
 		if (image != NULL)
 		{
@@ -218,10 +219,21 @@ void DicomViewer::openDicom()
 			EI_Status status = image->getStatus();
 
 			if (status == EIS_Normal)
-			{
-				const char *ptr = (char *)image->getOutputData();
-				QImage imageQt = QImage(fileName_Qt, ptr);
-				cerr << "Good" << endl;
+			{	
+				uchar* pixelData = (uchar*) (image->getOutputData(16));
+				if(pixelData != NULL) {
+					cerr << "Good" << endl;
+					QImage *imageQt = new QImage(pixelData, image->getWidth(), image->getHeight(), QImage::Format_RGB16);
+					cerr << imageQt->format() << endl;
+
+					QLabel label;
+					label.setPixmap(QPixmap::fromImage(*imageQt));
+					label.show();
+				}
+				else {
+					cerr << "Error getOutputData" << endl;
+				}
+				
 			}
 			else
 			{
