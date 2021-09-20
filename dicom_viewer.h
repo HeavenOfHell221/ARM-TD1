@@ -21,6 +21,11 @@ public:
   OFString transferSyntaxUID;
   OFString referencedFrameNumbers;  
   OFString patientSize;
+  OFString bitsAllocated;
+  OFString bitsStored; OFString highBit;
+  OFString windowCenter; OFString windowWidth;
+  OFString rescaleSlope;
+  OFString rescaleIntercept;
 
 public slots:
   void openDicom();

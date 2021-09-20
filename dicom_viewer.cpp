@@ -69,6 +69,8 @@ void DicomViewer::openDicom() {
       cerr << "Error: cannot access Transfer Syntax UID!" << endl;
     }
 
+    /*-----------------------------*/
+
     // (5/11) The dicom deftag DCM_ReferencedFrameNumbers don't have the same label as required but seems to be 
     //        the best among the others
     if (fileformat.getDataset()->findAndGetOFString(DCM_ReferencedFrameNumbers, referencedFrameNumbers).good()) {
@@ -76,7 +78,9 @@ void DicomViewer::openDicom() {
     } else {
       cerr << "Error: cannot access Referenced frame numbers!" << endl;
     }
-    
+
+    /*-----------------------------*/
+   
     // (6/11) The dicom deftag DCM_PatientSize don't have the same label as required but seems to be 
     //        the best among the others
     if (fileformat.getDataset()->findAndGetOFString(DCM_PatientSize, patientSize).good()) {
@@ -85,32 +89,72 @@ void DicomViewer::openDicom() {
       cerr << "Error: cannot access patientSize!" << endl;
     }
 
+    /*-----------------------------*/
+
+    // (7/11) Allowed values : If it's a range
+    //  - DCM_NominalMinEnergy / DCM_NominalMaxEnergy
+    //  - DCM_MinimumStoredValueMapped / DCM_MaximumStoredValueMapped
+    //  - DCM_MinDensity / DCM_MaxDensity
+    //  - DCM_DVHMinimumDose / DCM_DVHMaximumDose
+    //  - DCM_ChannelMinimumValue / DCM_ChannelMaximumValue
+
+    //  There is too many possibilities to choose randomly one among them, so it's possibly none of them and more likely  
+    //  a range between 0 and 2^DCM_BitsAllocated.
+    if (fileformat.getDataset()->findAndGetOFString(DCM_BitsAllocated, bitsAllocated).good()) {
+      cout << "0,bitsAllocated: " << "0" << "," << bitsAllocated << endl;
+    } else {
+      cerr << "Error: cannot access bitsAllocated!" << endl;
+    }
+
+    /*-----------------------------*/
+
+    // (8/11) Used values :
+    //  - [0; 2^DCM_BitsStored]
+    //  - [0; 2^DCM_HighBit]
+    if (fileformat.getDataset()->findAndGetOFString(DCM_BitsStored, bitsStored).good()
+    &&  fileformat.getDataset()->findAndGetOFString(DCM_HighBit, highBit).good()
+    ) {
+      cout << "bitsStored,highBit: " << bitsStored << "," << highBit << endl;
+    } else {
+      cerr << "Error: cannot access bitsStored or highBit !" << endl;
+    }
+
+    /*-----------------------------*/
+
+    // (9/11) Window :
+    //  - [DCM_EnergyWindowLowerLimit; DCM_EnergyWindowUpperLimit] 
+    //  - Very likely : DCM_WindowCenter and DCM_WindowWidth
+    if (fileformat.getDataset()->findAndGetOFString(DCM_WindowCenter, windowCenter).good()
+    &&  fileformat.getDataset()->findAndGetOFString(DCM_WindowWidth, windowWidth).good()
+    ) {
+      cout << "windowCenter,windowWidth: " << windowCenter << "," << windowWidth << endl;
+    } else {
+      cerr << "Error: cannot access windowCenter or windowWidth !" << endl;
+    }
+
+    /*-----------------------------*/
+
+    // (10/11) Slop : Maybe DCM_RescaleSlope
+    if (fileformat.getDataset()->findAndGetOFString(DCM_RescaleSlope, rescaleSlope).good()) {
+      cout << "rescaleSlope: " << rescaleSlope << endl;
+    } else {
+      cerr << "Error: cannot access rescaleSlope!" << endl;
+    }
+
+    /*-----------------------------*/
+
+    //(11/11) Intercept : Maybe DCM_RescaleIntercept
+    if (fileformat.getDataset()->findAndGetOFString(DCM_RescaleIntercept, rescaleIntercept).good()) {
+      cout << "rescaleIntercept: " << rescaleIntercept << endl;
+    } else {
+      cerr << "Error: cannot access rescaleIntercept!" << endl;
+    }
+
   } else { 
     cerr << "Error: cannot read DICOM file (" << status.text() << ")" << endl;
   }
 
-  /* A few trails */
-
-  // Allowed values : If it's a range
-  //  - DCM_NominalMinEnergy / DCM_NominalMaxEnergy
-  //  - DCM_MinimumStoredValueMapped / DCM_MaximumStoredValueMapped
-  //  - DCM_MinDensity / DCM_MaxDensity
-  //  - DCM_DVHMinimumDose / DCM_DVHMaximumDose
-  //  - DCM_ChannelMinimumValue / DCM_ChannelMaximumValue
-  //  - Very likely : Bits Allocated -> [0; 2^DCM_BitsAllocated]
-
-  // Used values :
-  //  - [0; 2^DCM_BitsStored]
-  //  - [0; 2^DCM_HighBit]
-  
-  // Window :
-  //  - [DCM_EnergyWindowLowerLimit; DCM_EnergyWindowUpperLimit] 
-  //  - Very likely : DCM_WindowCenter and DCM_WindowWidth
-
-  // Slop : Maybe DCM_RescaleSlope
-  // Intercept : Maybe DCM_RescaleIntercept
-
-
+  /* ------------------------------ Part 3 : ------------------------------ */
 
   DicomImage *image = new DicomImage(fileName);
   if (image != NULL)
@@ -161,12 +205,11 @@ void DicomViewer::showStats() {
   msg_oss << "Original transfer syntax: " << transferSyntaxUID << endl;
   msg_oss << "Nb frames: " << referencedFrameNumbers << endl;
   msg_oss << "Size: " << patientSize << endl;
-
-  msg_oss << "Allowed values: [TODO,TODO]" << endl;
-  msg_oss << "Used values: [TODO,TODO]" << endl;
-  msg_oss << "Window: [TODO,TODO]" << endl;
-  msg_oss << "Slope: TODO" << endl;
-  msg_oss << "Intercept: TODO" << endl;
+  msg_oss << "Allowed values: " << "[" << "0" << "," << bitsAllocated << "]"<< endl;
+  msg_oss << "Used values: " << "[" << bitsStored << "," << highBit << "]" << endl;
+  msg_oss << "Window: " << "[" << windowCenter << "," << windowWidth << "]" << endl;
+  msg_oss << "Slope: " << rescaleSlope << endl;
+  msg_oss << "Intercept: " << rescaleIntercept << endl;
 
   QMessageBox::information(this, "DCM file properties", msg_oss.str().c_str());
 }
