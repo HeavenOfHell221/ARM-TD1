@@ -6,268 +6,311 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QLabel>
+#include <ctype.h> //Check the belonging to a type
 
 using namespace std;
 
-DicomViewer::DicomViewer(QWidget *parent) : QMainWindow(parent)
-{
-	// Setting menu
-	QMenu *file_menu = menuBar()->addMenu("&File");
-	QAction *open_action = file_menu->addAction("&Open");
-	open_action->setShortcut(QKeySequence::Open);
-	QObject::connect(open_action, SIGNAL(triggered()), this, SLOT(openDicom()));
-	QAction *help_action = file_menu->addAction("&Help");
-	help_action->setShortcut(QKeySequence::HelpContents);
-	QObject::connect(help_action, SIGNAL(triggered()), this, SLOT(showStats()));
+DicomViewer::DicomViewer(QWidget *parent) : QMainWindow(parent) {
+  // Setting menu
+  QMenu *file_menu = menuBar()->addMenu("&File");
+  QAction *open_action = file_menu->addAction("&Open");
+  open_action->setShortcut(QKeySequence::Open);
+  QObject::connect(open_action, SIGNAL(triggered()), this, SLOT(openDicom()));
+  QAction *help_action = file_menu->addAction("&Help");
+  help_action->setShortcut(QKeySequence::HelpContents);
+  QObject::connect(help_action, SIGNAL(triggered()), this, SLOT(showStats()));
 }
 
 DicomViewer::~DicomViewer() {}
 
-void DicomViewer::openDicom()
+void DicomViewer::openDicom() 
 {
-	QString fileName_Qt = QFileDialog::getOpenFileName(this, tr("Open File"),"..",tr("Dcm File Format (*.dcm)"));
-	
-	if(fileName_Qt.isEmpty() || fileName_Qt.isNull()) 
-	{
-		// L'utilisateur n'a selectionné aucun fichier
-		return;
-	}
-	
-	string fileName_str = fileName_Qt.toStdString();
-	const char* fileName = fileName_str.c_str();
-	
-	
-	ostringstream msg_oss;
-	DcmFileFormat fileformat;
-	OFCondition status = fileformat.loadFile(fileName);
+    QString fileName_Qt = QFileDialog::getOpenFileName(this, tr("Open File"),"..",tr("Dcm File Format (*.dcm)"));
+    
+    if(fileName_Qt.isEmpty() || fileName_Qt.isNull()) 
+    {
+      // L'utilisateur n'a selectionné aucun fichier
+      return;
+    }
+    
+    string fileName_str = fileName_Qt.toStdString();
+    const char* fileName = fileName_str.c_str();
 
-	if (status.good())
-	{
-		msg_oss << "Your file have been succesfully selected" << endl;
-		DcmDataset *dataset = fileformat.getDataset();
+    ostringstream msg_oss;
+    DcmFileFormat fileformat;
+    OFCondition status = fileformat.loadFile(fileName);
 
-		// (1/11) The dicom deftag DCM_PatientName seems to be the best
-		if (dataset->findAndGetOFString(DCM_PatientName, patientName).good())
-		{
-			cout << "Patient's Name: " << patientName << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access Patient's Name." << endl;
-		}
+    if(status.good())
+    {
+      DcmDataset *dataset = fileformat.getDataset();
+      dataset->findAndGetOFString(DCM_PatientName, patientName);
+      dataset->findAndGetOFString(DCM_InstanceNumber, instanceNumber);
+      dataset->findAndGetOFString(DCM_AcquisitionNumber, acquisitionNumber);
+      dataset->findAndGetOFString(DCM_TransferSyntaxUID, transferSyntaxUID);
+      dataset->findAndGetOFString(DCM_ReferencedFrameNumbers, referencedFrameNumbers);
+      dataset->findAndGetOFString(DCM_PatientSize, patientSize);
+      dataset->findAndGetOFString(DCM_BitsAllocated, bitsAllocated);
+      dataset->findAndGetOFString(DCM_BitsStored, bitsStored);
+      dataset->findAndGetOFString(DCM_HighBit, highBit);
+      dataset->findAndGetOFString(DCM_EnergyWindowLowerLimit, energyWindowLowerLimit);  
+      dataset->findAndGetOFString(DCM_EnergyWindowUpperLimit, energyWindowUpperLimit); 
+      dataset->findAndGetOFString(DCM_RescaleSlope, rescaleSlope);
+      dataset->findAndGetOFString(DCM_RescaleIntercept, rescaleIntercept);
 
-		/*-----------------------------*/
+      /* ------------------------------ Part 3 : Start ------------------------------ */
 
-		// (2/11) The dicom deftag DCM_InstanceNumber seems to be the best
-		if (dataset->findAndGetOFString(DCM_InstanceNumber, instanceNumber).good())
-		{
-			cout << "Instance number: " << instanceNumber << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access Instance number!" << endl;
-		}
+      stringstream ss;
+      int width, center, slope, intercept;
+      ss << energyWindowLowerLimit;
+      ss >> center;
+      ss << energyWindowUpperLimit;
+      ss >> width;
+      ss << rescaleSlope;
+      ss >> slope;
+      ss << rescaleIntercept;
+      ss >> intercept;
 
-		/*-----------------------------*/
+      DJDecoderRegistration::registerCodecs();
+      DcmRLEDecoderRegistration::registerCodecs();
 
-		// (3/11) The dicom deftag DCM_AcquisitionNumber seems to be the best
-		if (dataset->findAndGetOFString(DCM_AcquisitionNumber, acquisitionNumber).good())
-		{
-			cout << "Acquisition number: " << acquisitionNumber << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access Acquisition number !" << endl;
-		}
+      DicomImage *image = new DicomImage(dataset, dataset->getCurrentXfer(), slope, intercept, 0, 0, 0);
 
-		/*-----------------------------*/
+      if (image != NULL)
+      {
+        image->setWindow(width, center);
 
-		// (4/11) The dicom deftag DCM_TransferSyntaxUID don't have the same label as required but seems to be
-		//        the best among the others
-		if (dataset->findAndGetOFString(DCM_TransferSyntaxUID, transferSyntaxUID).good())
-		{
-			cout << "Transfer Syntax UID: " << transferSyntaxUID << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access Transfer Syntax UID!" << endl;
-		}
+        EI_Status status = image->getStatus();
 
-		/*-----------------------------*/
+        if (status == EIS_Normal)
+        {	
+          uchar* pixelData = (uchar*) (image->getOutputData(16));
+          if(pixelData != NULL) {
+            cerr << "Good" << endl;
+            QImage *imageQt = new QImage(pixelData, image->getWidth(), image->getHeight(), QImage::Format_RGB16);
+            cerr << imageQt->format() << endl;
 
-		// (5/11) The dicom deftag DCM_ReferencedFrameNumbers don't have the same label as required but seems to be
-		//        the best among the others
-		if (dataset->findAndGetOFString(DCM_ReferencedFrameNumbers, referencedFrameNumbers).good())
-		{
-			cout << "Referenced frame numbers: " << referencedFrameNumbers << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access Referenced frame numbers!" << endl;
-		}
+            QLabel label;
+            label.setPixmap(QPixmap::fromImage(*imageQt));
+            label.show();
+          }
+          else {
+            cerr << "Error getOutputData" << endl;
+          }
+          
+        }
+        else
+        {
+          cerr << "Error: cannot load DICOM image (" << DicomImage::getString(image->getStatus()) << ")" << endl;
+        }
+      }
+      delete image;
 
-		/*-----------------------------*/
+      /* ------------------------------ Part 3 : End ------------------------------ */
 
-		// (6/11) The dicom deftag DCM_PatientSize don't have the same label as required but seems to be
-		//        the best among the others
-		if (dataset->findAndGetOFString(DCM_PatientSize, patientSize).good())
-		{
-			cout << "patientSize: " << patientSize << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access patientSize!" << endl;
-		}
+    } 
+    else 
+    { 
+      cerr << "Error: cannot read DICOM file (" << status.text() << ")" << endl;
+    }
 
-		/*-----------------------------*/
-
-		// (7/11) Allowed values : If it's a range
-		//  - DCM_NominalMinEnergy / DCM_NominalMaxEnergy
-		//  - DCM_MinimumStoredValueMapped / DCM_MaximumStoredValueMapped
-		//  - DCM_MinDensity / DCM_MaxDensity
-		//  - DCM_DVHMinimumDose / DCM_DVHMaximumDose
-		//  - DCM_ChannelMinimumValue / DCM_ChannelMaximumValue
-
-		//  There is too many possibilities to choose randomly one among them, so it's possibly none of them and more likely
-		//  a range between 0 and 2^DCM_BitsAllocated.
-		if (dataset->findAndGetOFString(DCM_BitsAllocated, bitsAllocated).good())
-		{
-			cout << "0,bitsAllocated: "
-				 << "0"
-				 << "," << bitsAllocated << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access bitsAllocated!" << endl;
-		}
-
-		/*-----------------------------*/
-
-		// (8/11) Used values :
-		//  - [0; 2^DCM_BitsStored]
-		//  - [0; 2^DCM_HighBit]
-		//  - [SmallestImagePixelValue; LargestImagePixelValue]
-		if (dataset->findAndGetOFString(DCM_BitsStored, bitsStored).good() && dataset->findAndGetOFString(DCM_HighBit, highBit).good())
-		{
-			cout << "bitsStored,highBit: " << bitsStored << "," << highBit << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access bitsStored or highBit !" << endl;
-		}
-
-		/*-----------------------------*/
-
-		// (9/11) Window :
-		//  - [DCM_EnergyWindowLowerLimit; DCM_EnergyWindowUpperLimit]
-		//  - Very likely : DCM_WindowCenter and DCM_WindowWidth
-		if (dataset->findAndGetOFString(DCM_WindowCenter, windowCenter).good() && dataset->findAndGetOFString(DCM_WindowWidth, windowWidth).good())
-		{
-			cout << "windowCenter,windowWidth: " << windowCenter << "," << windowWidth << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access windowCenter or windowWidth !" << endl;
-		}
-
-		/*-----------------------------*/
-
-		// (10/11) Slop : Maybe DCM_RescaleSlope
-		if (dataset->findAndGetOFString(DCM_RescaleSlope, rescaleSlope).good())
-		{
-			cout << "rescaleSlope: " << rescaleSlope << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access rescaleSlope!" << endl;
-		}
-
-		/*-----------------------------*/
-
-		//(11/11) Intercept : Maybe DCM_RescaleIntercept
-		if (dataset->findAndGetOFString(DCM_RescaleIntercept, rescaleIntercept).good())
-		{
-			cout << "rescaleIntercept: " << rescaleIntercept << endl;
-		}
-		else
-		{
-			cerr << "Error: cannot access rescaleIntercept!" << endl;
-		}
-
-		/* ------------------------------ Part 3 : ------------------------------ */
-
-		stringstream ss;
-		int width, center, slope, intercept;
-		ss << windowCenter;
-		ss >> center;
-		ss << windowWidth;
-		ss >> width;
-		ss << rescaleSlope;
-		ss >> slope;
-		ss << rescaleIntercept;
-		ss >> intercept;
-
-		DJDecoderRegistration::registerCodecs();
-		DcmRLEDecoderRegistration::registerCodecs();
-
-		DicomImage *image = new DicomImage(dataset, dataset->getCurrentXfer(), slope, intercept, 0, 0, 0);
-
-		if (image != NULL)
-		{
-			image->setWindow(width, center);
-
-			EI_Status status = image->getStatus();
-
-			if (status == EIS_Normal)
-			{	
-				uchar* pixelData = (uchar*) (image->getOutputData(16));
-				if(pixelData != NULL) {
-					cerr << "Good" << endl;
-					QImage *imageQt = new QImage(pixelData, image->getWidth(), image->getHeight(), QImage::Format_RGB16);
-					cerr << imageQt->format() << endl;
-
-					QLabel label;
-					label.setPixmap(QPixmap::fromImage(*imageQt));
-					label.show();
-				}
-				else {
-					cerr << "Error getOutputData" << endl;
-				}
-				
-			}
-			else
-			{
-				cerr << "Error: cannot load DICOM image (" << DicomImage::getString(image->getStatus()) << ")" << endl;
-			}
-		}
-		delete image;
-	}
-	else 
-	{
-		msg_oss << "Error." << endl;
-	}
-	QMessageBox::information(this, "DCM file properties", msg_oss.str().c_str());
+    QMessageBox::information(this, "DCM file properties", msg_oss.str().c_str());
 }
 
-void DicomViewer::showStats()
+bool isNumber(const string& str)
 {
-	ostringstream msg_oss;
-	msg_oss << "Patient: " << patientName << endl;
-	msg_oss << "Instance number: " << instanceNumber << endl;
-	msg_oss << "Acquisition number: " << acquisitionNumber << endl;
-	msg_oss << "Original transfer syntax: " << transferSyntaxUID << endl;
-	msg_oss << "Nb frames: " << referencedFrameNumbers << endl;
-	msg_oss << "Size: " << patientSize << endl;
-	msg_oss << "Allowed values: "
-			<< "["
-			<< "0"
-			<< "," << bitsAllocated << "]" << endl;
-	msg_oss << "Used values: "
-			<< "[" << bitsStored << "," << highBit << "]" << endl;
-	msg_oss << "Window: "
-			<< "[" << windowCenter << "," << windowWidth << "]" << endl;
-	msg_oss << "Slope: " << rescaleSlope << endl;
-	msg_oss << "Intercept: " << rescaleIntercept << endl;
-
-	QMessageBox::information(this, "DCM file properties", msg_oss.str().c_str());
+    const char * cha = str.c_str();
+    if(strcmp(cha, "-") == 0 || std::isdigit(str[0]) != 0){
+      for (char const &c : str) {
+          if (std::isdigit(c) == 0) 
+              return false;
+      }
+    }
+    return true;
 }
+
+bool isEmpty(const string& str)
+{
+    const char * cha = str.c_str();
+    if(strcmp(cha, "") == 0)
+        return true;
+    return false;
+}
+
+
+void DicomViewer::showStats() 
+{
+    ostringstream msg_oss;
+    DcmFileFormat fileformat;
+
+    // (1/11) The dicom deftag DCM_PatientName seems to be the best
+    // [DONE] - Not an empty string
+    if(isEmpty(patientName.c_str())) 
+    {
+      msg_oss << "Patient name information is empty !"<< endl;
+    } 
+    else 
+    {
+      msg_oss << "Patient: " << patientName << endl;
+    }
+
+    // (2/11) The dicom deftag DCM_InstanceNumber seems to be the best
+    // [DONE] - Not an empty string
+    // [DONE] - Check if it's a positive or negative number
+    if(isEmpty(instanceNumber.c_str()))
+    { 
+      msg_oss << "Instance number information is empty !"<< endl;
+    }    
+    else if(!isNumber(instanceNumber.c_str())) 
+    {
+      msg_oss << "Can't detect a valid instance number !" << endl;
+    } 
+    else 
+    {
+      msg_oss << "Instance number: " << instanceNumber << endl;
+    }
+    
+    // (3/11) The dicom deftag DCM_AcquisitionNumber seems to be the best
+    // [DONE] - Not an empty string
+    // [DONE] - Check if it's a positive or negative number
+    if(isEmpty(acquisitionNumber.c_str()))
+    { 
+      msg_oss << "Acquisition number information is empty !"<< endl;
+    }    
+    else if(!isNumber(acquisitionNumber.c_str())) 
+    {
+      msg_oss << "Can't detect a valid acquisition number !" << endl;
+    } 
+    else 
+    {
+      msg_oss << "Acquisition number: "<< acquisitionNumber << endl;
+    }
+
+    // (4/11) The dicom deftag DCM_TransferSyntaxUID don't have the same label as required but seems to be 
+    //        the best among the others
+    // [DONE] - Not an empty string
+    if(isEmpty(transferSyntaxUID.c_str()))
+    { 
+      msg_oss << "transferSyntaxUID information is empty !"<< endl;
+    }    
+    else 
+    {
+      msg_oss << "Original transfer syntax: " << transferSyntaxUID << endl;
+    }
+
+
+    // (5/11) The dicom deftag DCM_ReferencedFrameNumbers don't have the same label as required but seems to be 
+    //        the best among the others
+    // [DONE] - Not an empty string
+    // [DONE] - Check if it's a positive or negative number
+    if(isEmpty(referencedFrameNumbers.c_str()))
+    { 
+      msg_oss << "ReferencedFrameNumbers information is empty !"<< endl;
+    }    
+    else if(!isNumber(referencedFrameNumbers.c_str())) 
+    {
+      msg_oss << "Can't detect a valid referencedFrameNumbers !" << endl;
+    } 
+    else 
+    {
+      msg_oss << "Nb frames: " << referencedFrameNumbers << endl;
+    }
+    
+/*** ---------- TODO : START ----------***/
+    // (6/11) The dicom deftag DCM_PatientSize don't have the same label as required but seems to be 
+    //        the best among the others
+    // [TODO] - Not an empty string
+    // [TODO] - Check if it's a triplet of positive or negative number
+    // [TODO] - Find Xfer
+    msg_oss << "Size: " << patientSize << endl; 
+
+    // (7/11) Allowed values : If it's a range
+    //  - DCM_NominalMinEnergy / DCM_NominalMaxEnergy
+    //  - DCM_MinimumStoredValueMapped / DCM_MaximumStoredValueMapped
+    //  - DCM_MinDensity / DCM_MaxDensity
+    //  - DCM_DVHMinimumDose / DCM_DVHMaximumDose
+    //  - DCM_ChannelMinimumValue / DCM_ChannelMaximumValue
+    //  There is too many possibilities to choose randomly one among them, so it's possibly none of them and more likely  
+    //  a range between 0 and 2^DCM_BitsAllocated.
+    // [TODO] - Not an empty string
+    // [TODO] - Check if it's a positive or negative number
+    // [TODO] - Check if the min value is lower than the max value
+    // [TODO] - Find the thing linked to bitsAllocated 
+    msg_oss << "Allowed values: " << "[" << "0" << "," << bitsAllocated << "]"<< endl;
+    
+    // (8/11) Used values :
+    // [TODO] - Not an empty string
+    // [TODO] - Check if it's a doublet of positive or negative number
+    // [TODO] - Check if the min value is lower than the max value
+    // [TODO] - Find the array to browse
+    msg_oss << "Used values: " << "[" << bitsStored << "," << highBit << "]" << endl;  
+
+/*** ---------- TODO : END ----------***/
+    
+    // (9/11) The dicom deftags DCM_EnergyWindowLowerLimit and DCM_EnergyWindowUpperLimit seem to be the bests
+    // [DONE] - Not an empty string
+    // [DONE] - Check if it's a doublet of positive or negative number
+    // [DONE] - Check if the min value is lower than the max value
+    if(isEmpty(energyWindowLowerLimit.c_str()))
+    { 
+      msg_oss << "energyWindowLowerLimit information is empty !"<< endl;
+    } 
+    else if (isEmpty(energyWindowUpperLimit.c_str()))
+    {
+      msg_oss << "energyWindowUpperLimit information is empty !"<< endl;
+    }
+    else if(!isNumber(energyWindowLowerLimit.c_str())) 
+    {
+      msg_oss << "Can't detect a valid energyWindowLowerLimit !" << endl;
+    } 
+    else if(!isNumber(energyWindowUpperLimit.c_str())) 
+    {
+      msg_oss << "Can't detect a valid energyWindowUpperLimit !" << endl;
+    } 
+    else if(energyWindowLowerLimit.c_str() > energyWindowUpperLimit.c_str())
+    {
+      msg_oss << "Lower limit is over than the Upper limit !" << endl;
+    }
+    else 
+    {
+      msg_oss << "Window: " << "[Center:" << energyWindowLowerLimit << ",Width:" << energyWindowUpperLimit << "]" << endl;
+    }
+
+    // (10/11) The dicom deftag DCM_RescaleSlope seems to be the best 
+    // [DONE] - Not an empty string
+    // [DONE] - Check if it's a positive or negative number
+    if(isEmpty(rescaleSlope.c_str()))
+    { 
+      msg_oss << "Slope information is empty !"<< endl;
+    }    
+    else if(!isNumber(rescaleSlope.c_str())) 
+    {
+      msg_oss << "Can't detect a valid Slope !" << endl;
+    } 
+    else 
+    {
+      msg_oss << "Slope: " << rescaleSlope << endl;
+    }
+    
+    //(11/11) The dicom deftag DCM_RescaleIntercept seems to be the best 
+    // [DONE] - Not an empty string
+    // [DONE] - Check if it's a positive or negative number
+    if(isEmpty(rescaleIntercept.c_str()))
+    { 
+      msg_oss << "Intercept information is empty !"<< endl;
+    }    
+    else if(!isNumber(rescaleIntercept.c_str())) 
+    {
+      msg_oss << "Can't detect a valid Intercept !" << endl;
+    } 
+    else 
+    {
+      msg_oss << "Intercept: " << rescaleIntercept << endl;
+    }
+
+    QMessageBox::information(this, "DCM file properties", msg_oss.str().c_str());
+}
+
+
+
+
+
