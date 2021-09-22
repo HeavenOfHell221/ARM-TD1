@@ -56,19 +56,16 @@ void DicomViewer::openDicom()
       dataset->findAndGetOFString(DCM_EnergyWindowUpperLimit, energyWindowUpperLimit); 
       dataset->findAndGetOFString(DCM_RescaleSlope, rescaleSlope);
       dataset->findAndGetOFString(DCM_RescaleIntercept, rescaleIntercept);
+	  dataset->findAndGetOFString(DCM_WindowCenter, windowCenter);
+	  dataset->findAndGetOFString(DCM_WindowWidth, windowWidth);
 
       /* ------------------------------ Part 3 : Start ------------------------------ */
 
-      stringstream ss;
       int width, center, slope, intercept;
-      ss << energyWindowLowerLimit;
-      ss >> center;
-      ss << energyWindowUpperLimit;
-      ss >> width;
-      ss << rescaleSlope;
-      ss >> slope;
-      ss << rescaleIntercept;
-      ss >> intercept;
+	  width = atoi(windowWidth.c_str());
+      center = atoi(windowCenter.c_str());
+	  slope = atoi(rescaleSlope.c_str());
+	  intercept = atoi(rescaleIntercept.c_str());
 
       DJDecoderRegistration::registerCodecs();
       DcmRLEDecoderRegistration::registerCodecs();
@@ -84,16 +81,16 @@ void DicomViewer::openDicom()
         if (status == EIS_Normal)
         {	
           uchar* pixelData = (uchar*) (image->getOutputData(16));
-          if(pixelData != NULL) {
-            cerr << "Good" << endl;
+          if(pixelData != NULL) 
+		  {
             QImage *imageQt = new QImage(pixelData, image->getWidth(), image->getHeight(), QImage::Format_RGB16);
-            cerr << imageQt->format() << endl;
 
             QLabel label;
             label.setPixmap(QPixmap::fromImage(*imageQt));
             label.show();
           }
-          else {
+          else 
+		  {
             cerr << "Error getOutputData" << endl;
           }
           
@@ -128,15 +125,6 @@ bool isNumber(const string& str)
     return true;
 }
 
-bool isEmpty(const string& str)
-{
-    const char * cha = str.c_str();
-    if(strcmp(cha, "") == 0)
-        return true;
-    return false;
-}
-
-
 void DicomViewer::showStats() 
 {
     ostringstream msg_oss;
@@ -144,7 +132,7 @@ void DicomViewer::showStats()
 
     // (1/11) The dicom deftag DCM_PatientName seems to be the best
     // [DONE] - Not an empty string
-    if(isEmpty(patientName.c_str())) 
+    if(patientName.empty()) 
     {
       msg_oss << "Patient name information is empty !"<< endl;
     } 
@@ -156,7 +144,7 @@ void DicomViewer::showStats()
     // (2/11) The dicom deftag DCM_InstanceNumber seems to be the best
     // [DONE] - Not an empty string
     // [DONE] - Check if it's a positive or negative number
-    if(isEmpty(instanceNumber.c_str()))
+    if(instanceNumber.empty())
     { 
       msg_oss << "Instance number information is empty !"<< endl;
     }    
@@ -172,7 +160,7 @@ void DicomViewer::showStats()
     // (3/11) The dicom deftag DCM_AcquisitionNumber seems to be the best
     // [DONE] - Not an empty string
     // [DONE] - Check if it's a positive or negative number
-    if(isEmpty(acquisitionNumber.c_str()))
+    if(acquisitionNumber.empty())
     { 
       msg_oss << "Acquisition number information is empty !"<< endl;
     }    
@@ -188,7 +176,7 @@ void DicomViewer::showStats()
     // (4/11) The dicom deftag DCM_TransferSyntaxUID don't have the same label as required but seems to be 
     //        the best among the others
     // [DONE] - Not an empty string
-    if(isEmpty(transferSyntaxUID.c_str()))
+    if(transferSyntaxUID.empty())
     { 
       msg_oss << "transferSyntaxUID information is empty !"<< endl;
     }    
@@ -202,7 +190,7 @@ void DicomViewer::showStats()
     //        the best among the others
     // [DONE] - Not an empty string
     // [DONE] - Check if it's a positive or negative number
-    if(isEmpty(referencedFrameNumbers.c_str()))
+    if(referencedFrameNumbers.empty())
     { 
       msg_oss << "ReferencedFrameNumbers information is empty !"<< endl;
     }    
@@ -250,11 +238,11 @@ void DicomViewer::showStats()
     // [DONE] - Not an empty string
     // [DONE] - Check if it's a doublet of positive or negative number
     // [DONE] - Check if the min value is lower than the max value
-    if(isEmpty(energyWindowLowerLimit.c_str()))
+    if(energyWindowLowerLimit.empty())
     { 
       msg_oss << "energyWindowLowerLimit information is empty !"<< endl;
     } 
-    else if (isEmpty(energyWindowUpperLimit.c_str()))
+    else if (energyWindowUpperLimit.empty())
     {
       msg_oss << "energyWindowUpperLimit information is empty !"<< endl;
     }
@@ -278,7 +266,7 @@ void DicomViewer::showStats()
     // (10/11) The dicom deftag DCM_RescaleSlope seems to be the best 
     // [DONE] - Not an empty string
     // [DONE] - Check if it's a positive or negative number
-    if(isEmpty(rescaleSlope.c_str()))
+    if(rescaleSlope.empty())
     { 
       msg_oss << "Slope information is empty !"<< endl;
     }    
@@ -294,7 +282,7 @@ void DicomViewer::showStats()
     //(11/11) The dicom deftag DCM_RescaleIntercept seems to be the best 
     // [DONE] - Not an empty string
     // [DONE] - Check if it's a positive or negative number
-    if(isEmpty(rescaleIntercept.c_str()))
+    if(rescaleIntercept.empty())
     { 
       msg_oss << "Intercept information is empty !"<< endl;
     }    
