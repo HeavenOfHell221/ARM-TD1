@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QVBoxLayout>
+#include <QLabel>
 
 #include "dcmtk/dcmdata/dcrledrg.h"
 #include "dcmtk/dcmdata/dctk.h"
@@ -30,6 +31,7 @@ public:
   OFString rescaleIntercept;
   OFString energyWindowLowerLimit;
   OFString energyWindowUpperLimit;
+  QLabel *label;
 
 public slots:
   void openDicom();
