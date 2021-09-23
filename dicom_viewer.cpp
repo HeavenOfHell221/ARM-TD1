@@ -23,7 +23,10 @@ DicomViewer::DicomViewer(QWidget *parent) : QMainWindow(parent), label(new QLabe
     QObject::connect(help_action, SIGNAL(triggered()), this, SLOT(showStats()));
 }
 
-DicomViewer::~DicomViewer() {}
+DicomViewer::~DicomViewer()
+{
+    delete image;
+}
 
 void DicomViewer::openDicom()
 {
@@ -52,8 +55,8 @@ void DicomViewer::openDicom()
         dataset->findAndGetOFString(DCM_ReferencedFrameNumbers, referencedFrameNumbers);
         dataset->findAndGetOFString(DCM_PatientSize, patientSize);
         dataset->findAndGetOFString(DCM_BitsAllocated, bitsAllocated);
-        dataset->findAndGetOFString(DCM_BitsStored, bitsStored);
-        dataset->findAndGetOFString(DCM_HighBit, highBit);
+        dataset->findAndGetOFString(DCM_MinimumStoredValueMapped, minimumStoredValueMapped);
+        dataset->findAndGetOFString(DCM_MaximumStoredValueMapped, maximumStoredValueMapped);
         dataset->findAndGetOFString(DCM_EnergyWindowLowerLimit, energyWindowLowerLimit);
         dataset->findAndGetOFString(DCM_EnergyWindowUpperLimit, energyWindowUpperLimit);
         dataset->findAndGetOFString(DCM_RescaleSlope, rescaleSlope);
@@ -72,7 +75,7 @@ void DicomViewer::openDicom()
         DJDecoderRegistration::registerCodecs();
         DcmRLEDecoderRegistration::registerCodecs();
 
-        DicomImage *image = new DicomImage(dataset, dataset->getCurrentXfer(), slope, intercept, 0, 0, 0);
+        image = new DicomImage(dataset, dataset->getCurrentXfer(), slope, intercept, 0, 0, 0);
 
         image->setWindow(width, center);
         image->setMinMaxWindow(1);
@@ -88,7 +91,7 @@ void DicomViewer::openDicom()
                 {
                     QImage *imageQt = new QImage(pixelData, image->getWidth(), image->getHeight(), QImage::Format_Indexed8);
                     label->setPixmap(QPixmap::fromImage(*imageQt));
-                    
+
                     msg_oss << "Succes" << endl;
                 }
                 else
@@ -101,7 +104,6 @@ void DicomViewer::openDicom()
                 msg_oss << "Error: cannot load DICOM image (" << DicomImage::getString(image->getStatus()) << ")" << endl;
             }
         }
-        delete image;
 
         /* ------------------------------ Part 3 : End ------------------------------ */
     }
@@ -113,8 +115,7 @@ void DicomViewer::openDicom()
     QMessageBox::information(this, "DCM file properties", msg_oss.str().c_str());
 }
 
-bool isNumber(const string &str)
-{
+bool isNumber(const string &str) {
     const char *cha = str.c_str();
     if (strcmp(cha, "-") == 0 || std::isdigit(str[0]) != 0)
     {
@@ -129,6 +130,11 @@ bool isNumber(const string &str)
 
 void DicomViewer::showStats()
 {
+    if (image == NULL)
+    {
+        return;
+    }
+
     ostringstream msg_oss;
     DcmFileFormat fileformat;
 
@@ -209,8 +215,7 @@ void DicomViewer::showStats()
     //        the best among the others
     // [TODO] - Not an empty string
     // [TODO] - Check if it's a triplet of positive or negative number
-    // [TODO] - Find Xfer
-    msg_oss << "Size: " << patientSize << endl;
+    msg_oss << "Size: " << image->getWidth() << "*" << image->getHeight() << "*" << image->getDepth() << endl;
 
     // (7/11) Allowed values : If it's a range
     //  - DCM_NominalMinEnergy / DCM_NominalMaxEnergy
@@ -224,18 +229,51 @@ void DicomViewer::showStats()
     // [TODO] - Check if it's a positive or negative number
     // [TODO] - Check if the min value is lower than the max value
     // [TODO] - Find the thing linked to bitsAllocated
+    double min, max = 0;
+    image->getMinMaxValues(min, max);
+    if (min > max)
+    {
+        msg_oss << "min is over than the max !" << endl;
+    }
     msg_oss << "Allowed values: "
-            << "["
-            << "0"
-            << "," << bitsAllocated << "]" << endl;
+            << "[min:" << min << ", max:" << max << "]" << endl;
 
     // (8/11) Used values :
-    // [TODO] - Not an empty string
-    // [TODO] - Check if it's a doublet of positive or negative number
-    // [TODO] - Check if the min value is lower than the max value
-    // [TODO] - Find the array to browse
-    msg_oss << "Used values: "
-            << "[" << bitsStored << "," << highBit << "]" << endl;
+    // [DONE] - Not an empty string
+    // [DONE] - Check if it's a doublet of positive or negative number
+    // [DONE] - Check if the min value is lower than the max value
+    // [DONE] - Find the array to browse
+    if (minimumStoredValueMapped.empty())
+    {
+        msg_oss << "minimumStoredValueMapped information is empty !" << endl;
+    }
+    else if (maximumStoredValueMapped.empty())
+    {
+        msg_oss << "maximumStoredValueMapped information is empty !" << endl;
+    }
+    else if (!isNumber(minimumStoredValueMapped.c_str()))
+    {
+        msg_oss << "Can't detect a valid minimumStoredValueMapped !" << endl;
+    }
+    else if (!isNumber(maximumStoredValueMapped.c_str()))
+    {
+        msg_oss << "Can't detect a valid maximumStoredValueMapped !" << endl;
+    }
+    else
+    {
+        double lower = atoi(minimumStoredValueMapped.c_str());
+        double upper = atoi(maximumStoredValueMapped.c_str());
+
+        if (lower > upper)
+        {
+            msg_oss << "Lower value is over than the Upper value !" << endl;
+        }
+        else
+        {
+            msg_oss << "Used values: "
+                    << "[min:" << minimumStoredValueMapped << ", max:" << maximumStoredValueMapped << "]" << endl;
+        }
+    }
 
     /*** ---------- TODO : END ----------***/
 
@@ -259,14 +297,20 @@ void DicomViewer::showStats()
     {
         msg_oss << "Can't detect a valid energyWindowUpperLimit !" << endl;
     }
-    else if (energyWindowLowerLimit.c_str() > energyWindowUpperLimit.c_str())
-    {
-        msg_oss << "Lower limit is over than the Upper limit !" << endl;
-    }
     else
     {
-        msg_oss << "Window: "
-                << "[Center:" << energyWindowLowerLimit << ",Width:" << energyWindowUpperLimit << "]" << endl;
+        double lower = atoi(energyWindowLowerLimit.c_str());
+        double upper = atoi(energyWindowUpperLimit.c_str());
+
+        if (lower > upper)
+        {
+            msg_oss << "Lower limit is over than the Upper limit !" << endl;
+        }
+        else
+        {
+            msg_oss << "Window: "
+                    << "[min:" << energyWindowLowerLimit << ", max:" << energyWindowUpperLimit << "]" << endl;
+        }
     }
 
     // (10/11) The dicom deftag DCM_RescaleSlope seems to be the best

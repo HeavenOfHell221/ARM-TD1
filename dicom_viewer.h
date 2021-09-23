@@ -23,8 +23,8 @@ public:
   OFString referencedFrameNumbers;  
   OFString patientSize;
   OFString bitsAllocated;
-  OFString bitsStored; 
-  OFString highBit;
+  OFString minimumStoredValueMapped; 
+  OFString maximumStoredValueMapped;
   OFString windowCenter; 
   OFString windowWidth;
   OFString rescaleSlope;
@@ -32,6 +32,7 @@ public:
   OFString energyWindowLowerLimit;
   OFString energyWindowUpperLimit;
   QLabel *label;
+  DicomImage *image;
 
 public slots:
   void openDicom();
